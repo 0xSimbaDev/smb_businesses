@@ -4,6 +4,27 @@ local isInsideZone = false
 local playerJob = nil
 local isOnDuty = nil
 
+
+RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
+    -- playerJob = QBCore.Functions.GetPlayerData().job
+    -- setUpBlips()
+end)
+
+local function setUpBlips()
+
+    for _, business in pairs(Config.Businesses) do
+        local businessBlip = AddBlipForCoord(business.Coordinates.x, business.Coordinates.y, business.Coordinates.z)
+        SetBlipSprite(businessBlip, business.Blip.icon)
+        SetBlipDisplay(businessBlip, 3)
+        SetBlipScale(businessBlip, 1.0)
+        SetBlipAsShortRange(businessBlip, true)
+        SetBlipColour(businessBlip, business.Blip.color)
+        BeginTextCommandSetBlipName("STRING")
+        AddTextComponentSubstringPlayerName(business.Name)
+        EndTextCommandSetBlipName(businessBlip)
+    end
+end
+
 local DrawText3Ds = function(x, y, z, text)
     SetTextScale(0.35, 0.35)
     SetTextFont(4)
@@ -86,7 +107,8 @@ local function PerformWorkAction(workArea)
                             materials = productData.Materials,
                             animationLib = productData.AnimationLib,
                             animationName = productData.AnimationName,
-                            animationDesc = productData.AnimationDesc
+                            animationDesc = productData.AnimationDesc,
+                            yield = productData.yield
                         },
                         workArea = workArea.Name,
                     }
@@ -98,6 +120,19 @@ local function PerformWorkAction(workArea)
         TriggerEvent('qb-menu:client:openMenu', menuData)
     end
 end
+function dump(o)
+    if type(o) == 'table' then
+       local s = '{ '
+       for k,v in pairs(o) do
+          if type(k) ~= 'number' then k = '"'..k..'"' end
+          s = s .. '['..k..'] = ' .. dump(v) .. ','
+       end
+       return s .. '} '
+    else
+       return tostring(o)
+    end
+ end
+
 
 RegisterNetEvent('smb_businesses:client:MakeProduct')
 AddEventHandler('smb_businesses:client:MakeProduct', function(data)
@@ -123,7 +158,7 @@ AddEventHandler('smb_businesses:client:MakeProduct', function(data)
             disableMouse = false,
             disableCombat = true,
         }, {}, {}, {}, function()
-            TriggerServerEvent("smb_businesses:server:PerformWorkAction", product.product, product.materials)
+            TriggerServerEvent("smb_businesses:server:PerformWorkAction", product)
             TriggerEvent('qb-inventory:client:set:busy', false)
             StopAnimTask(PlayerPedId(), product.animationLib, workArea.animationName, 1.0)
         end, function()
@@ -136,6 +171,7 @@ end)
 
 local function StartWorkLoops()
     Citizen.CreateThread(function()
+      
         while isInsideZone do
             Citizen.Wait(1)
             local playerCoords = GetEntityCoords(PlayerPedId())
@@ -145,21 +181,23 @@ local function StartWorkLoops()
 
                 for _, workArea in ipairs(workAreas) do
                     local workAreaCoords = workArea.Coords
-                    local distance = #(playerCoords - vector3(workAreaCoords.X, workAreaCoords.Y, workAreaCoords.Z))
+                    local distance = GetDistanceBetweenCoords(playerCoords.x, playerCoords.y, playerCoords.z,
+                    workAreaCoords.x, workAreaCoords.y, workAreaCoords.z)
+                   
 
                     if distance <= 2.0 then
                         if (workArea.IsCashier or workArea.IsStash) and distance <= 1 then
-                            DrawText3Ds(workAreaCoords.X, workAreaCoords.Y, workAreaCoords.Z, workArea.Name .. ' ~y~[E]~w~')
+                            DrawText3Ds(workAreaCoords.x, workAreaCoords.y, workAreaCoords.z, workArea.Name .. ' ~y~[E]~w~')
                             if IsControlJustPressed(0, 38) then
                                 PerformWorkAction(workArea)
                             end
                         elseif workArea.IsClockingIn and playerJob == 'burgershot' then
-                            DrawText3Ds(workAreaCoords.X, workAreaCoords.Y, workAreaCoords.Z, workArea.Name .. ' ~y~[E]~w~')
+                            DrawText3Ds(workAreaCoords.x, workAreaCoords.y, workAreaCoords.z, workArea.Name .. ' ~y~[E]~w~')
                             if IsControlJustPressed(0, 38) then
                                 PerformWorkAction(workArea)
                             end
                         elseif playerJob == 'burgershot' and distance <= 1 then
-                            DrawText3Ds(workAreaCoords.X, workAreaCoords.Y, workAreaCoords.Z, workArea.Name .. ' ~y~[E]~w~')
+                            DrawText3Ds(workAreaCoords.x, workAreaCoords.y, workAreaCoords.z, workArea.Name .. ' ~y~[E]~w~')
                             if IsControlJustPressed(0, 38) then
                                 PerformWorkAction(workArea)
                             end
@@ -172,6 +210,7 @@ local function StartWorkLoops()
 end
 
 CreateThread(function()
+    setUpBlips()
     for _, business in ipairs(Config.Businesses) do
         if business.Open then
             local zone = PolyZone:Create(business.PolyZone.points, {

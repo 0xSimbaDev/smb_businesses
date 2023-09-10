@@ -14,14 +14,33 @@ AddEventHandler('smb_businesses:server:ExitBusinessZone', function()
     playersInZone[src] = nil
     print(playersInZone)
 end)
-
+function dump(o)
+    if type(o) == 'table' then
+       local s = '{ '
+       for k,v in pairs(o) do
+          if type(k) ~= 'number' then k = '"'..k..'"' end
+          s = s .. '['..k..'] = ' .. dump(v) .. ','
+       end
+       return s .. '} '
+    else
+       return tostring(o)
+    end
+ end
 RegisterServerEvent('smb_businesses:server:PerformWorkAction')
-AddEventHandler('smb_businesses:server:PerformWorkAction', function(product, rawMaterials)
+AddEventHandler('smb_businesses:server:PerformWorkAction', function(data)
     local src = source
     local Player = QBCore.Functions.GetPlayer(src)
-    local product = product
-    local materials = rawMaterials
+    local product = data.product
+    local materials = data.materials
+    local yield = 1
 
+    if data.yield then
+        yield = data.yield
+    end
+    print(dump(data))
+    print(product)
+    print(materials)
+    print(yield)
     if not product or not materials or #materials == 0 then
         return
     end
@@ -32,7 +51,7 @@ AddEventHandler('smb_businesses:server:PerformWorkAction', function(product, raw
     end
 
     TriggerClientEvent('qb-inventory:client:ItemBox', src, QBCore.Shared.Items[product], "add")
-    Player.Functions.AddItem(product, 1)
+    Player.Functions.AddItem(product, data.yield)
 end)
 
 RegisterServerEvent('smb_businesses:server:SendInvoice')
